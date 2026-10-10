@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Binance Radar Pro · 全市场异动监控 · by 九夏</title>
+<link rel="icon" href="assets/logo.png" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brandwrap">
+      <div class="logo" aria-hidden="true">
+        <img class="logopng" src="assets/logo.png" alt="Binance Radar Pro" />
+      </div>
+      <div>
+        <div class="brand">Binance Radar Pro <small id="verText">v1.8.0</small></div>
+        <div class="sub">合约 · 现货 · Alpha 全市场暴涨暴跌 / 强平 / 大单 实时监控（只读行情，不涉及下单）</div>
+      </div>
+    </div>
+    <div class="statuswrap">
+      <div class="status"><span class="dot" id="dotFut"></span>合约 <span id="futText">连接中</span></div>
+      <div class="status"><span class="dot" id="dotSpot"></span>现货 <span id="spotText">连接中</span></div>
+      <div class="status"><span class="dot" id="dotAlpha"></span>Alpha <span id="alphaText">连接中</span></div>
+      <div class="status"><span class="dot" id="dotNet"></span>线路 <span id="netText">探测中</span></div>
+      <button class="mbtn" id="netReprobe" title="重新探测直连 / 代理可用性并自动择优切换">重新探测</button>
+    </div>
+    <div class="authorbox" title="作者">
+      <img class="avatar" src="assets/avatar.jpg" alt="九夏" onerror="this.style.display='none'"/>
+      <div class="author">
+        <span class="byname">by 九夏</span>
+        <em>作者</em>
+      </div>
+    </div>
+  </div>
+
+  <div class="notice" id="netNotice">正在探测网络线路（官方域名 / 官方公共镜像直连）…</div>
+  <div class="notice" id="lanNotice" style="display:none">📱 手机访问：连同一 WiFi 后浏览器打开 <b id="lanUrlText"></b>（无需 VPN，实时刷新，专为手机优化）</div>
+
+  <div class="toolbar">
+    <div class="control"><label>异动窗口（分钟）</label><input id="windowMin" type="number" value="5" min="1" max="60"></div>
+    <div class="control"><label>暴涨阈值 %</label><input id="upPct" type="number" value="5" step="0.1"></div>
+    <div class="control"><label>暴跌阈值 %</label><input id="downPct" type="number" value="-5" step="0.1"></div>
+    <div class="control"><label>大单阈值 USDT</label><input id="largeUsd" type="number" value="250000" step="50000"></div>
+    <div class="control"><label>强平显示阈值 USDT</label><input id="liqUsd" type="number" value="100000" step="10000"></div>
+    <div class="control"><label>Alpha 异动阈值 %</label><input id="alphaPct" type="number" value="8" step="1"></div>
+    <div class="control action"><button id="applyBtn">应用参数</button></div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="l">暴涨触发</div><div class="v green" id="upCount">0</div><div class="x" id="upSub">合约/现货</div></div>
+    <div class="kpi"><div class="l">暴跌触发</div><div class="v red" id="downCount">0</div><div class="x" id="downSub">合约/现货</div></div>
+    <div class="kpi"><div class="l">近5m 强平</div><div class="v yellow" id="liqTotal">0</div><div class="x">USDT</div></div>
+    <div class="kpi"><div class="l">近5m 大单</div><div class="v blue" id="bigTotal">0</div><div class="x" id="bigSub">分片扫描</div></div>
+    <div class="kpi"><div class="l">合约监控</div><div class="v blue" id="futCount">0</div><div class="x">USDT 永续</div></div>
+    <div class="kpi"><div class="l">现货监控</div><div class="v green" id="spotCount">0</div><div class="x">USDT 交易对</div></div>
+    <div class="kpi"><div class="l">Alpha 代币</div><div class="v purple" id="alphaCount">0</div><div class="x" id="alphaSub">等待后端</div></div>
+    <div class="kpi"><div class="l">Alpha 异动</div><div class="v yellow" id="alphaBurst">0</div><div class="x">按窗口涨跌</div></div>
+    <div class="kpi"><div class="l">全市场上涨/下跌</div><div class="v" id="breadth">0 / 0</div><div class="x" id="breadthSub">当前所选市场</div></div>
+  </div>
+
+  <div class="markets">
+    <button class="mbtn active" data-market="futures">合约永续<span class="n" id="mFut">0</span></button>
+    <button class="mbtn" data-market="spot">现货<span class="n" id="mSpot">0</span></button>
+    <button class="mbtn" data-market="alpha">Alpha<span class="n" id="mAlpha">0</span></button>
+    <div class="spacer"></div>
+    <button class="mbtn" id="clearAlerts">清空报警</button>
+  </div>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ptitle red">暴跌监控 <span id="downBadge">0</span></div>
+      <div class="hint">所选市场 · 短周期急跌 · 附量能 / 振幅 / 评分</div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>机构</th><th>币种</th><th>时间</th><th>跌幅</th><th>价格</th><th>24h量</th><th>评分</th><th id="spThDown" style="display:none">策略位置</th></tr></thead>
+        <tbody id="downBody"></tbody>
+      </table></div>
+    </section>
+
+    <section class="panel">
+      <div class="ptitle green">暴涨监控 <span id="upBadge">0</span></div>
+      <div class="hint">所选市场 · 短周期急涨 · 附量能 / 振幅 / 评分</div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>机构</th><th>币种</th><th>时间</th><th>涨幅</th><th>价格</th><th>24h量</th><th>评分</th><th id="spThUp" style="display:none">策略位置</th></tr></thead>
+        <tbody id="upBody"></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <section class="panel sections">
+    <div class="ptitle">🌡️ 市场热力 · <span id="heatTitle">合约永续</span> <span id="heatMeta" class="muted" style="font-size:12px"></span></div>
+    <div class="hint">按 24 小时涨跌幅绝对值排序，取前 40 个币；色块随行情实时刷新，覆盖所选市场全部监控币种</div>
+    <div class="row">
+      <label class="muted">排序</label>
+      <select id="heatSort">
+        <option value="chgDesc">24h 涨幅从高到低</option>
+        <option value="chgAsc">24h 跌幅从高到低</option>
+        <option value="volDesc">24h 成交额从高到低</option>
+      </select>
+      <span class="muted">固定展示 24h 涨跌幅前 40 个币</span>
+    </div>
+    <div id="heat" class="heat"></div>
+  </section>
+
+  <section class="panel sections">
+    <div class="tabs">
+      <button class="tabbtn active" data-tab="all">📋 全市场列表</button>
+      <button class="tabbtn" data-tab="liq">💥 强平</button>
+      <button class="tabbtn" data-tab="big">🐋 大单</button>
+      <button class="tabbtn" data-tab="deriv">💰 衍生品</button>
+      <button class="tabbtn" data-tab="struct">📐 价格/OI 结构</button>
+      <button class="tabbtn" data-tab="alpha">🅰️ Alpha 行情</button>
+      <button class="tabbtn" data-tab="alerts">🔔 报警中心</button>
+      <button class="tabbtn" data-tab="history">📜 历史记录</button>
+    </div>
+
+    <div id="tab-all" class="tab active">
+      <div class="row">
+        <input id="allSearch" placeholder="搜索币种…" style="width:180px" />
+        <select id="allMarket">
+          <option value="all">全部市场</option>
+          <option value="futures">合约永续</option>
+          <option value="spot">现货</option>
+          <option value="alpha">Alpha</option>
+        </select>
+        <select id="allSort">
+          <option value="chgDesc">窗口涨幅 ↓</option>
+          <option value="chgAsc">窗口跌幅 ↓</option>
+          <option value="chg24Desc">24h 涨幅 ↓</option>
+          <option value="chg24Asc">24h 跌幅 ↓</option>
+          <option value="volDesc">24h 成交额 ↓</option>
+        </select>
+        <span class="muted" id="allMeta"></span>
+      </div>
+      <div class="tablewrap" style="max-height:560px"><table>
+        <thead><tr><th>#</th><th>市场</th><th>币种</th><th>现价</th><th>窗口涨跌</th><th>24h涨跌</th><th>24h成交额</th><th>24h高/低</th><th>更新时间</th></tr></thead>
+        <tbody id="allBody"></tbody>
+      </table></div>
+      <div class="pages">
+        <button id="allPrev">上一页</button>
+        <span id="allPageInfo">1 / 1</span>
+        <button id="allNext">下一页</button>
+        <span class="muted" id="allCount"></span>
+      </div>
+    </div>
+
+    <div id="tab-liq" class="tab">
+      <div class="grid2">
+        <div><h3>最近强平（合约全市场）</h3><div class="tablewrap"><table>
+          <thead><tr><th>时间</th><th>币种</th><th>方向</th><th>金额</th><th>价格</th></tr></thead>
+          <tbody id="liqBody"></tbody>
+        </table></div></div>
+        <div><h3>近 5 分钟强平排行</h3><div class="tablewrap"><table>
+          <thead><tr><th>币种</th><th>总额</th><th>多单爆仓</th><th>空单爆仓</th></tr></thead>
+          <tbody id="liqRankBody"></tbody>
+        </table></div></div>
+      </div>
+      <div class="notice" id="liqNotice">数据来源：币安合约强平订单推送流（!forceOrder@arr），仅统计单笔名义价值达阈值的强平。</div>
+    </div>
+
+    <div id="tab-big" class="tab">
+      <div class="grid2">
+        <div><h3>最近大单</h3><div class="tablewrap"><table>
+          <thead><tr><th>时间</th><th>市场</th><th>币种</th><th>方向</th><th>金额</th><th>价格</th></tr></thead>
+          <tbody id="bigBody"></tbody>
+        </table></div></div>
+        <div><h3>近 5 分钟大单排行</h3><div class="tablewrap"><table>
+          <thead><tr><th>币种</th><th>金额</th><th>笔数</th></tr></thead>
+          <tbody id="bigRankBody"></tbody>
+        </table></div></div>
+      </div>
+      <div class="notice" id="bigNotice">大单采用分片轮换订阅：逐批扫描全部合约，单轮覆盖完整市场。</div>
+    </div>
+
+    <div id="tab-deriv" class="tab">
+      <h3>资金费率 / 标记价格（全量合约）</h3>
+      <div class="row">
+        <input id="derivSearch" placeholder="搜索币种…" style="width:170px" />
+        <select id="derivSort">
+          <option value="abs">资金费率绝对值 ↓</option>
+          <option value="hi">资金费率最高</option>
+          <option value="lo">资金费率最低</option>
+        </select>
+      </div>
+      <div class="tablewrap" style="max-height:520px"><table>
+        <thead><tr><th>币种</th><th>资金费率</th><th>年化</th><th>标记价格</th><th>更新时间</th></tr></thead>
+        <tbody id="derivBody"></tbody>
+      </table></div>
+    </div>
+
+    <div id="tab-struct" class="tab">
+      <h3>价格 + 持仓量（OI）结构</h3>
+      <div class="tablewrap"><table>
+        <thead><tr><th>币种</th><th>结构</th><th>窗口涨跌</th><th>OI 变化</th><th>评分</th><th>等级</th></tr></thead>
+        <tbody id="structBody"></tbody>
+      </table></div>
+      <div class="notice">结构分类：上涨+增仓、上涨+减仓、下跌+增仓、下跌+减仓。仅供参考，不构成交易信号。</div>
+    </div>
+
+    <div id="tab-alpha" class="tab">
+      <div class="row">
+        <input id="alphaSearch" placeholder="搜索 Alpha 代币…" style="width:190px" />
+        <select id="alphaSort">
+          <option value="volDesc">24h 成交额 ↓</option>
+          <option value="chgDesc">24h 涨幅 ↓</option>
+          <option value="chgAsc">24h 跌幅 ↓</option>
+          <option value="wDesc">窗口涨幅 ↓</option>
+          <option value="wAsc">窗口跌幅 ↓</option>
+          <option value="mcapDesc">市值 ↓</option>
+        </select>
+        <label class="muted">连锁</label>
+        <select id="alphaChain"><option value="">全部</option></select>
+        <span class="muted" id="alphaMeta"></span>
+      </div>
+      <div class="tablewrap" style="max-height:560px"><table>
+        <thead><tr><th>#</th><th>代币</th><th>链</th><th>现价</th><th>窗口涨跌</th><th>24h涨跌</th><th>24h成交额</th><th>市值</th><th>已上CEX</th></tr></thead>
+        <tbody id="alphaBody"></tbody>
+      </table></div>
+      <div class="notice" id="alphaNotice">Alpha 数据由本地后端每 10 秒全量采集，覆盖币安 Alpha 全部已上线代币；窗口涨跌基于后端采样的价格序列计算。</div>
+    </div>
+
+    <div id="tab-alerts" class="tab">
+      <h3>报警中心</h3>
+      <div class="row">
+        <select id="alertFilter">
+          <option value="">全部类型</option>
+          <option value="BURST">暴涨暴跌</option>
+          <option value="LIQ">大额强平</option>
+          <option value="BIG">大单</option>
+          <option value="ALPHA">Alpha 异动</option>
+        </select>
+        <span class="muted" id="alertMeta"></span>
+      </div>
+      <div class="tablewrap" style="max-height:520px"><table>
+        <thead><tr><th>时间</th><th>类型</th><th>市场</th><th>币种</th><th>方向</th><th>幅度</th><th>价格</th><th>评分</th><th>说明</th></tr></thead>
+        <tbody id="alertBody"></tbody>
+      </table></div>
+    </div>
+
+    <div id="tab-history" class="tab">
+      <h3>异动历史记录 <span class="muted" id="histMeta" style="font-size:12px"></span></h3>
+      <div class="hint">由本地后端持久化保存（SQLite），软件重启后仍可查看；支持按类型 / 市场筛选与清空。</div>
+      <div class="row">
+        <input id="histSearch" placeholder="搜索币种 / 说明…" style="width:190px" />
+        <label class="muted">类型</label>
+        <select id="histKind">
+          <option value="">全部类型</option>
+          <option value="BURST_UP">暴涨异动</option>
+          <option value="BURST_DOWN">暴跌异动</option>
+          <option value="ALPHA_UP">Alpha 暴涨</option>
+          <option value="ALPHA_DOWN">Alpha 暴跌</option>
+          <option value="LIQ">大额强平</option>
+          <option value="BIG">大额成交</option>
+        </select>
+        <label class="muted">市场</label>
+        <select id="histMarket">
+          <option value="">全部市场</option>
+          <option value="futures">合约永续</option>
+          <option value="spot">现货</option>
+          <option value="alpha">Alpha</option>
+        </select>
+        <label class="muted">显示条数</label>
+        <select id="histLimit">
+          <option value="200">最近 200</option>
+          <option value="500">最近 500</option>
+          <option value="1000">最近 1000</option>
+          <option value="5000">最近 5000</option>
+        </select>
+        <button id="histRefresh">刷新</button>
+        <button id="histClear">清空历史</button>
+      </div>
+      <div class="tablewrap" style="max-height:560px"><table>
+        <thead><tr><th>时间</th><th>触发类型</th><th>市场</th><th>币种</th><th>窗口涨跌</th><th>24h涨跌</th><th>24h成交额</th><th>评分</th><th>等级</th><th>说明</th></tr></thead>
+        <tbody id="histBody"></tbody>
+      </table></div>
+      <div class="notice" id="histNotice">历史记录由本地后端持久化保存，软件重启后仍可查看。</div>
+    </div>
+  </section>
+
+  <section class="panel sections">
+    <div class="ptitle">🎯 策略位置（参考）</div>
+    <div class="hint">开启后，上方「暴涨监控 / 暴跌监控」列表中每个币种会多出一列推荐买入位置：建议买入区间下沿 / 上沿、距现价百分比、分批买入建议与失效（止损）参考位，点「依据」可展开推算过程与数据基准。</div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="stratEnabled" /> 启用策略位置</label>
+      <label class="chk"><input type="checkbox" id="stratExpandAll" /> 默认展开依据</label>
+      <span class="muted" id="stratState">已关闭</span>
+    </div>
+    <div class="notice warnline" id="stratNotice">位置由公开行情机械推算（现价、窗口涨跌、1 分钟 K 线 MA20 / MA60、近 60 分钟与 24h 高低点、平均分钟波动，合约场景叠加 OI 变化），不预测行情走势、不保证成交与收益，仅供参考，不构成投资建议；请结合自身风险承受能力独立决策，风险自担。</div>
+  </section>
+
+  <section class="panel sections">
+    <div class="ptitle">📧 合约 / 现货暴涨异动邮箱推送（含策略）</div>
+    <div class="hint">仅推送合约 / 现货的暴涨异动（含策略位置），Alpha 异动与暴跌不推送；支持同时推送 3 个收件邮箱（发件账号不变，收件邮箱 2 / 3 可选填）；由本地后端通过 SMTP 直接把币种、涨幅、成交额、评分与策略位置等关键信息发到你的邮箱；配置保存在本机，重启软件不丢失。</div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="mailEnabled" /> 启用邮箱推送</label>
+      <label class="muted">SMTP 服务器</label>
+      <input id="mailHost" type="text" placeholder="smtp.qq.com" style="width:150px" />
+      <label class="muted">端口</label>
+      <input id="mailPort" type="number" value="465" style="width:70px" />
+      <label class="muted">账号</label>
+      <input id="mailUser" type="text" placeholder="xxx@qq.com" style="width:160px" />
+      <label class="muted">密码 / 授权码</label>
+      <input id="mailPass" type="password" placeholder="留空表示不修改" style="width:150px" />
+      <label class="muted">收件邮箱 1</label>
+      <input id="mailTo1" type="text" placeholder="a@qq.com" style="width:160px" />
+      <label class="muted">收件邮箱 2（可选）</label>
+      <input id="mailTo2" type="text" placeholder="b@163.com" style="width:160px" />
+      <label class="muted">收件邮箱 3（可选）</label>
+      <input id="mailTo3" type="text" placeholder="c@foxmail.com" style="width:160px" />
+    </div>
+    <div class="row">
+      <label class="muted">推送间隔（秒）</label>
+      <input id="mailGapSec" type="number" min="5" max="3600" step="1" value="30" style="width:80px" />
+      <label class="muted">每分钟上限</label>
+      <input id="mailMaxPerMin" type="number" min="1" max="60" step="1" value="3" style="width:80px" />
+      <button id="mailSave">保存配置</button>
+      <button id="mailTest">测试发送</button>
+      <span class="muted" id="mailState">未启用</span>
+    </div>
+    <div class="notice" id="mailNotice">说明：① 推荐使用 QQ / 163 邮箱的「授权码」作为密码（登录密码通常被 SMTP 服务拒绝）；② 端口 465 走 SSL 加密，587 / 25 自动尝试 STARTTLS；③ 同币种同一方向 5 分钟内不重复推送，配合「推送间隔 / 每分钟上限」双重防刷屏。</div>
+  </section>
+
+  <section class="panel sections">
+    <div class="ptitle">🔔 异动即时提醒</div>
+    <div class="hint">检测到新异动时，桌面版在 Windows 右下角弹出系统通知（Toast，打游戏等全屏场景也能看到，点击通知可一键把监控窗口带到前台）；软件内开关仍保留，网页版无后端时自动降级为浏览器通知 + 应用内浮层。</div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="notifyEnabled" /> 启用异动提醒</label>
+      <label class="chk"><input type="checkbox" id="notifySound" /> 提示音</label>
+      <label class="chk"><input type="checkbox" id="notifySystem" /> 桌面右下角通知(Toast)</label>
+      <label class="muted">最小提醒间隔(秒)</label>
+      <input id="notifyGap" type="number" min="0" max="600" step="1" style="width:80px" />
+      <label class="muted">每分钟上限</label>
+      <input id="notifyMax" type="number" min="1" max="600" step="1" style="width:80px" />
+      <button id="notifyTest">测试提醒</button>
+      <span class="muted" id="notifyState">已关闭</span>
+    </div>
+    <div class="notice" id="notifyPerm">系统通知权限：未授权</div>
+    <div class="notice">提示音由浏览器实时合成（无需音频文件）；桌面版程序内直接播放。桌面版「桌面右下角通知」由本地后端弹出（Windows Toast，不依赖浏览器权限），未授权或全屏游戏时依然可见，点击可把监控窗口带到前台；网页版则使用浏览器系统通知，未授权时自动降级为应用内浮层提醒。同一币种同一类型 5 分钟内不会重复提醒。</div>
+  </section>
+
+  <div class="statusbar">
+    <span id="lastMsg">初始化…</span>
+    <span>v1.7.0：行情来源币安官方公共接口（fapi / api / alpha bapi）；无代理时现货自动切换官方公共镜像直连（data-api / data-stream.binance.vision），合约与 Alpha 标注「当前需代理」· 热力图 24h 前 40 · 邮箱推送（仅合约+现货暴涨，本地后端 SMTP，开关拨动即保存、刷新不回弹）· 桌面右下角 Toast 通知 · 本地只读，不使用 API Key</span>
+  </div>
+
+  <div class="footauthor">Binance Radar Pro · by <b>九夏</b> · 只读行情监控</div>
+</div>
+
+  <div class="notice" id="pubNotice" style="display:none">🌐 公网在线版：任意网络（手机流量 / 朋友电脑）均可打开本页面，行情由浏览器直连币安官方接口；邮箱推送与 Alpha 等本地能力请使用桌面版或云端监控。</div>
+
+<div id="toasts" class="toasts"></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
